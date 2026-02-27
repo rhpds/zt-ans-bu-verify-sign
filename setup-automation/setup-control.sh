@@ -19,7 +19,7 @@ retry "curl -k -L https://${SATELLITE_URL}/pub/katello-server-ca.crt -o /etc/pki
 retry "update-ca-trust"
 retry "rpm -Uhv https://${SATELLITE_URL}/pub/katello-ca-consumer-latest.noarch.rpm"
 retry "subscription-manager register --org=${SATELLITE_ORG} --activationkey=${SATELLITE_ACTIVATIONKEY}"
-retry "dnf install python3 python3-pip"
+retry "dnf install -y python3 python3-pip"
 
 
 # # Install collection(s)
