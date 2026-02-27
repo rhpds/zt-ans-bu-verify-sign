@@ -17,8 +17,8 @@ retry() {
 
 rpm -e $(rpm -qa katello-ca-consumer*) 2>/dev/null || true
 retry "curl -k -L https://${SATELLITE_URL}/pub/katello-server-ca.crt -o /etc/pki/ca-trust/source/anchors/${SATELLITE_URL}.ca.crt"
-retry "rpm -Uhv https://${SATELLITE_URL}/pub/katello-ca-consumer-latest.noarch.rpm"
 retry "update-ca-trust"
+retry "rpm -Uhv https://${SATELLITE_URL}/pub/katello-ca-consumer-latest.noarch.rpm"
 retry "subscription-manager register --force --org=${SATELLITE_ORG} --activationkey=${SATELLITE_ACTIVATIONKEY}"
 retry "dnf install -y python3 python3-pip"
 
