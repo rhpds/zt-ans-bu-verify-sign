@@ -60,7 +60,7 @@ cd ~
 ansible-galaxy collection install ansible.test_collection -c
 ----
 
-The collection installs successfully with no errors. However, without the `--keyring` option, `ansible-galaxy` skips signature verification entirely -- it has no way to confirm that the collection is authentic and untampered. The install succeeds, but you have no cryptographic guarantee about the content you just downloaded.
+The collection installs successfully with no errors. *However, without the* `--keyring` *option,* `ansible-galaxy` *skips signature verification entirely* -- it has no way to confirm that the collection is authentic and untampered. The install succeeds, but you have no cryptographic guarantee about the content you just downloaded.
 
 ---
 

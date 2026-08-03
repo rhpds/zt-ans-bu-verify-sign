@@ -139,76 +139,165 @@ A successful job proves the full end-to-end chain:
 * You created an inventory and a Job Template.
 * You launched the job and saw it succeed -- proving that signed content flows from development to execution with integrity verified at every stage.
 
-== Going Further: Content Credentials for Collection Verification in Controller
+== Going Further: Organization Galaxy Credentials and `requirements.yml`
 
-In this lab, you embedded the signed collection directly in the project and relied on *project-level* signature validation to cover it. But Automation Controller also supports verifying collection signatures at the point of installation using a *Content Credential* -- the same GPG public key concept you used in Module 3, applied to collections instead of projects.
+In this lab, you embedded the signed collection in git and relied on *project-level* Content Signature Validation to cover it. In production, organizations more often pull collections from Private Automation Hub at project sync time.
 
-This is useful when Controller installs collections from Private Automation Hub via `requirements.yml` rather than bundling them in the project repository. Here is how you would set it up.
+The organization-scale control for that is not a GPG field on the organization. Organizations use **Galaxy credentials** (`Ansible Galaxy/Automation Hub API Token`) to decide which content servers projects may install from. Project-level **Content Signature Validation Credential** (the GPG Public Key you used in Module 3) still only validates *project* signatures.
 
-=== Step 1: Create a GPG Public Key Credential with the Hub's Signing Key
+This optional path shows that org-scoped Galaxy credential pattern end to end.
 
-In Module 3, you created a GPG credential using your *personal* signing key. To verify collections signed by Private Automation Hub, you need a second credential using the *hub's signing service* public key.
+=== Step 1: Get a Private Automation Hub API Token
 
-Navigate to **Automation Execution** -> **Infrastructure** -> **Credentials** and click **Create credential**:
+In the `Terminal` tab, read the token already written into your Galaxy config:
+
+[source,bash]
+----
+awk -F= '/^token=/{print $2; exit}' ~/ansible.cfg
+----
+
+If that is empty, create a new token:
+
+[source,bash]
+----
+curl -sk -u admin:ansible123! -X POST https://localhost/api/galaxy/v3/auth/token/ | jq -r .token
+----
+
+Copy the token value. You will paste it into Controller next.
+
+=== Step 2: Create an Ansible Galaxy / Automation Hub Credential
+
+Go to the `Automation-Controller` tab. Navigate to **Automation Execution** -> **Infrastructure** -> **Credentials** and click **Create credential**:
 
 [cols="1,2a"]
 |===
 | Parameter | Value
-| Name | `PAH Signing Service`
-| Credential Type | `GPG Public Key`
-| Public Key | Contents of `~/galaxy_signing_service.asc` (the hub's signing service public key exported in Module 6)
+| Name | `Private Automation Hub — Published`
+| Organization | `Default`
+| Credential Type | `Ansible Galaxy/Automation Hub API Token`
+| Galaxy Server URL | `https://localhost/api/galaxy/content/published/`
+| API Token | The token from Step 1
 |===
 
-You can display the key in the terminal:
+Leave **Auth Server URL** blank. Click **Create Credential**.
+
+=== Step 3: Attach the Credential to the Organization
+
+Galaxy credentials are attached at the *Organization* level. Every project in that organization uses this ordered list when installing collections from `collections/requirements.yml`.
+
+Navigate to **Access Management** -> **Organizations**, open **Default**, and click **Edit organization**.
+
+In **Galaxy credentials**, add `Private Automation Hub — Published` and place it **first** in the list (order sets precedence). Click **Save**.
+
+=== Step 4: Allow Self-Signed TLS for Galaxy Downloads
+
+This lab uses a self-signed certificate on the platform gateway. Navigate to **Settings** -> **Job settings** and enable **Ignore Ansible Galaxy SSL Certificate Verification**, then save.
+
+Without that setting, project syncs that install collections from `https://localhost` may fail TLS verification.
+
+=== Step 5: Create a Project That Pulls Collections from the Hub
+
+Create a small project that declares the signed collection in `requirements.yml` instead of committing collection files to git:
 
 [source,bash]
 ----
-cat ~/galaxy_signing_service.asc
+mkdir -p ~/hub-collections-demo/{playbooks,collections}
+cat << 'EOF' > ~/hub-collections-demo/collections/requirements.yml
+---
+collections:
+  - name: ansible.test_collection
+    version: 1.0.0
+EOF
+cat << 'EOF' > ~/hub-collections-demo/playbooks/use_hub_collection.yml
+---
+- name: Use a collection installed from Private Automation Hub
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Call hello_world from ansible.test_collection
+      ansible.test_collection.hello_world:
+        name: "PAH via requirements.yml"
+      register: result
+
+    - name: Show the result
+      ansible.builtin.debug:
+        var: result.msg
+EOF
 ----
 
-Copy the full output (including the `-----BEGIN PGP PUBLIC KEY BLOCK-----` and `-----END PGP PUBLIC KEY BLOCK-----` lines) and paste it into the **Public Key** field.
+In the `Gitea` tab, create a new repository named `hub-collections-demo` under the `student` account (leave it empty -- do not initialize with a README). Then push from the terminal:
 
-=== Step 2: Attach the Content Credential to an Organization
+[source,bash]
+----
+cd ~/hub-collections-demo
+git init
+git add collections/requirements.yml playbooks/use_hub_collection.yml
+git commit -m "Pull signed collection from PAH via requirements.yml"
+git remote add origin http://gitea:3000/student/hub-collections-demo.git
+git push -u origin HEAD
+----
 
-Content credentials are attached at the *Organization* level, not the project level. This means every project in that organization will verify collection signatures when installing from PAH.
+Use Gitea username `gitea` and password `gitea` if prompted.
 
-Navigate to **Access Management** -> **Organizations** and click on the **Default** organization. Click **Edit organization**.
+=== Step 6: Create and Sync the Project in Controller
 
-In the **Galaxy credentials** section, your PAH credential should already be configured (this is what allows Controller to pull collections from your hub). Below that, find the **Content Signature Validation Credential** field and select the `PAH Signing Service` credential you just created.
+In Controller, navigate to **Automation Execution** -> **Projects** and click **Create project**:
 
-Click **Save**.
+[cols="1,2a"]
+|===
+| Parameter | Value
+| Name | `Hub Collections Project`
+| Organization | `Default`
+| Source Control Type | `Git`
+| Source Control URL | `http://gitea:3000/student/hub-collections-demo.git`
+| Content Signature Validation Credential | Leave empty for this exercise
+|===
 
-=== Step 3: How It Works
+Click **Create project**. The sync should succeed and, because of the org Galaxy credential, install `ansible.test_collection` from Private Automation Hub.
 
-With the content credential configured, any time Controller installs collections for a project in that organization (via a `collections/requirements.yml` file), it will:
+Open the project update job and look for the collection install task. You should see Controller run something equivalent to `ansible-galaxy collection install` against your hub.
 
-1. Download the collection from Private Automation Hub.
-2. Fetch the collection's GPG signature from the hub.
-3. Verify the signature against the `PAH Signing Service` public key.
-4. **Fail the project sync** if the signature is missing or invalid.
+NOTE: Leave **Content Signature Validation Credential** empty here on purpose. That field is for project signing (`ansible-sign`), which you already practiced on **Signed Project**. This exercise is only about org Galaxy credentials and hub-sourced collections.
 
-This provides the same kind of trust chain you saw in Module 8 with `ansible-galaxy --keyring`, but enforced automatically by Controller on every project sync.
+=== Step 7: Run the Playbook
 
-=== How This Differs from What We Did in the Lab
+Create a job template (you can reuse `Module 09 Inventory`):
+
+[cols="1,2a"]
+|===
+| Parameter | Value
+| Name | `Hub Collection Demo`
+| Project | `Hub Collections Project`
+| Inventory | `Module 09 Inventory`
+| Playbook | `playbooks/use_hub_collection.yml`
+|===
+
+Launch it. A successful job means Controller used the organization Galaxy credential to install the signed collection from PAH, then executed a module from that collection.
+
+=== How the Trust Boundaries Differ
 
 [cols="1,1"]
 |===
-| **This lab (embedded collection)** | **Content credential approach**
+| **This lab (embedded collection)** | **Org Galaxy credential approach**
 
-| Collection bundled in git repo
-| Collection pulled from PAH at sync time via `requirements.yml`
+| Collection files committed into the git project
+| Collection pulled from PAH at sync time via `collections/requirements.yml`
 
-| Project signature covers the collection files
-| Collection signature verified independently by Controller
+| Org does not need a PAH Galaxy credential for the collection
+| Organization Galaxy credential controls which hub/Galaxy servers may supply content
 
-| Uses your personal GPG key (Module 2)
-| Uses the hub's signing service key (Module 6)
+| Project Content Signature Validation covers playbooks *and* embedded collection files
+| Project signature (if used) covers playbooks and `requirements.yml`; PAH is the source of truth for the collection artifact
 
-| Integrity validated as part of the project
-| Integrity validated at collection install time
+| Uses your personal GPG key on the project (Module 2/3)
+| Uses an `Ansible Galaxy/Automation Hub API Token` on the organization
+
+| Collection GPG verification shown on the CLI in Module 8 (`--keyring`)
+| Collection GPG verification is still a client/keyring concern; Controller's org-level control is *which content server* is trusted
 |===
 
-Both approaches provide cryptographic integrity. The content credential approach is more common in production because it avoids committing large collection artifacts to git and lets PAH serve as the single source of truth for signed content.
+The Galaxy-credential approach is what most production Controller setups use: keep playbooks in git, keep collections in Private Automation Hub, and scope hub access per organization. Combine it with project signing when you also want `ansible-sign` protection on the repository that declares those dependencies.
 
 ---
 
@@ -219,7 +308,7 @@ This lab has covered the complete content signing story in Ansible Automation Pl
 * **Project signing** (Modules 2-5): You used `ansible-sign` to sign Ansible projects locally with your own GPG key. Automation Controller validated those signatures when syncing projects from source control.
 * **Collection signing** (Modules 6-8): You published collections to Private Automation Hub, which signed them server-side using its own signing service. You verified those signatures on the client side using `ansible-galaxy` with a GPG keyring.
 * **End-to-end execution** (Module 9): You ran a playbook from Controller that uses a module from a signed collection -- all within a signature-validated project. The collection's integrity was established by PAH, and the project's integrity was validated by Controller.
-* **Content credentials** (Going Further): You learned how Controller can also verify collection signatures at install time using a GPG Public Key credential attached to an organization -- the production-oriented approach for collections pulled from PAH.
+* **Organization Galaxy credentials** (Going Further): You configured an `Ansible Galaxy/Automation Hub API Token` on the organization so Controller could install signed collections from PAH via `requirements.yml` -- the production-oriented alternative to embedding collections in git.
 
 Together, these mechanisms provide end-to-end content integrity for Ansible automation -- from the projects that define your automation workflows to the reusable collections they depend on.
 

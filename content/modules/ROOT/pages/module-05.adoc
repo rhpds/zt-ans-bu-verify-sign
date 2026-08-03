@@ -18,7 +18,7 @@ In the last challenge, you added playbooks to the `ansible-sign-demo` local repo
 
 First, you must add the new files to the `MANIFEST.in` file so the `ansible-sign` tool knows to sign them.
 
-Run the following command to append the new directives to your `MANIFEST.in`:
+Run the following command in the home directory to append the new directives to your `MANIFEST.in`:
 
 [source,bash]
 ----
