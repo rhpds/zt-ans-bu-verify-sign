@@ -139,13 +139,15 @@ A successful job proves the full end-to-end chain:
 * You created an inventory and a Job Template.
 * You launched the job and saw it succeed -- proving that signed content flows from development to execution with integrity verified at every stage.
 
-== Going Further: Organization Galaxy Credentials and `requirements.yml`
+== Going Further: Organization Galaxy Credentials
 
-In this lab, you embedded the signed collection in git and relied on *project-level* Content Signature Validation to cover it. In production, organizations more often pull collections from Private Automation Hub at project sync time.
+In this lab, you embedded the signed collection in git and relied on *project-level* Content Signature Validation to cover it. In production, organizations more often declare collections in `collections/requirements.yml` and let Controller install them from Private Automation Hub during project sync.
 
-The organization-scale control for that is not a GPG field on the organization. Organizations use **Galaxy credentials** (`Ansible Galaxy/Automation Hub API Token`) to decide which content servers projects may install from. Project-level **Content Signature Validation Credential** (the GPG Public Key you used in Module 3) still only validates *project* signatures.
+The organization-scale control for that is not a GPG field on the organization. Organizations use **Galaxy credentials** (`Ansible Galaxy/Automation Hub API Token`) to decide which content servers projects may install from. Project-level **Content Signature Validation Credential** (the GPG Public Key from Module 3) still only validates *project* signatures.
 
-This optional path shows that org-scoped Galaxy credential pattern end to end.
+This optional path configures that org-scoped Galaxy credential and proves the hub URL and token work. It also shows the `requirements.yml` pattern Controller uses in production.
+
+NOTE: In this single-node lab, Controller project-sync jobs run in `slirp4netns` containers that can reach Gitea, but cannot hairpin back to Private Automation Hub on the same VM. The platform also locks `DEFAULT_CONTAINER_RUN_OPTIONS`, so that cannot be changed from the UI/API. Because of that lab topology limit, the live "Controller sync installs from PAH" hop is not reliable here. The steps below still teach the real org-scale control plane and verify the credential against PAH from the host.
 
 === Step 1: Get a Private Automation Hub API Token
 
@@ -181,6 +183,8 @@ Go to the `Automation-Controller` tab. Navigate to **Automation Execution** -> *
 
 Leave **Auth Server URL** blank. Click **Create Credential**.
 
+If you already created this credential while troubleshooting earlier, edit it so the Galaxy Server URL is `https://localhost/api/galaxy/content/published/`.
+
 === Step 3: Attach the Credential to the Organization
 
 Galaxy credentials are attached at the *Organization* level. Every project in that organization uses this ordered list when installing collections from `collections/requirements.yml`.
@@ -189,15 +193,26 @@ Navigate to **Access Management** -> **Organizations**, open **Default**, and cl
 
 In **Galaxy credentials**, add `Private Automation Hub — Published` and place it **first** in the list (order sets precedence). Click **Save**.
 
-=== Step 4: Allow Self-Signed TLS for Galaxy Downloads
+Confirm from the terminal:
 
-This lab uses a self-signed certificate on the platform gateway. Navigate to **Settings** -> **Job settings** and enable **Ignore Ansible Galaxy SSL Certificate Verification**, then save.
+[source,bash]
+----
+ORG_ID=$(curl -sk -u admin:ansible123! \
+  'https://localhost/api/controller/v2/organizations/?name=Default' | jq -r '.results[0].id')
+curl -sk -u admin:ansible123! \
+  "https://localhost/api/controller/v2/organizations/${ORG_ID}/galaxy_credentials/" \
+  | jq -r '.results[] | "\(.name)\t\(.inputs.url)"'
+----
 
-Without that setting, project syncs that install collections from `https://localhost` may fail TLS verification.
+You should see `Private Automation Hub — Published` listed first, pointing at the published hub URL.
 
-=== Step 5: Create a Project That Pulls Collections from the Hub
+=== Step 4: Confirm Galaxy SSL Ignore Is Enabled
 
-Create a small project that declares the signed collection in `requirements.yml` instead of committing collection files to git:
+This lab uses a self-signed certificate on the platform gateway. Navigate to **Settings** -> **Job settings** and confirm **Ignore Ansible Galaxy SSL Certificate Verification** is enabled.
+
+=== Step 5: Author a `requirements.yml` Project Layout
+
+This is the production project shape: playbooks in git, collections declared as dependencies -- not vendored into the repo.
 
 [source,bash]
 ----
@@ -226,54 +241,37 @@ cat << 'EOF' > ~/hub-collections-demo/playbooks/use_hub_collection.yml
 EOF
 ----
 
-In the `Gitea` tab, create a new repository named `hub-collections-demo` under the `student` account (leave it empty -- do not initialize with a README). Then push from the terminal:
+Optionally push it to Gitea as a reference repo (same flow as the main lab project):
 
 [source,bash]
 ----
 cd ~/hub-collections-demo
 git init
 git add collections/requirements.yml playbooks/use_hub_collection.yml
-git commit -m "Pull signed collection from PAH via requirements.yml"
+git commit -m "Declare signed collection via requirements.yml"
+# Create an empty student/hub-collections-demo repo in the Gitea tab first, then:
 git remote add origin http://gitea:3000/student/hub-collections-demo.git
 git push -u origin HEAD
 ----
 
-Use Gitea username `gitea` and password `gitea` if prompted.
+=== Step 6: Prove the Org Credential Target Works
 
-=== Step 6: Create and Sync the Project in Controller
+From the host (which can reach the gateway), install the signed collection using the same URL and token you put on the organization credential:
 
-In Controller, navigate to **Automation Execution** -> **Projects** and click **Create project**:
+[source,bash]
+----
+TOKEN=$(awk -F= '/^token=/{print $2; exit}' ~/ansible.cfg)
+ansible-galaxy collection install ansible.test_collection:1.0.0 \
+  -s "https://localhost/api/galaxy/content/published/" \
+  --token "$TOKEN" \
+  -c --force
+----
 
-[cols="1,2a"]
-|===
-| Parameter | Value
-| Name | `Hub Collections Project`
-| Organization | `Default`
-| Source Control Type | `Git`
-| Source Control URL | `http://gitea:3000/student/hub-collections-demo.git`
-| Content Signature Validation Credential | Leave empty for this exercise
-|===
+A successful install means:
 
-Click **Create project**. The sync should succeed and, because of the org Galaxy credential, install `ansible.test_collection` from Private Automation Hub.
-
-Open the project update job and look for the collection install task. You should see Controller run something equivalent to `ansible-galaxy collection install` against your hub.
-
-NOTE: Leave **Content Signature Validation Credential** empty here on purpose. That field is for project signing (`ansible-sign`), which you already practiced on **Signed Project**. This exercise is only about org Galaxy credentials and hub-sourced collections.
-
-=== Step 7: Run the Playbook
-
-Create a job template (you can reuse `Module 09 Inventory`):
-
-[cols="1,2a"]
-|===
-| Parameter | Value
-| Name | `Hub Collection Demo`
-| Project | `Hub Collections Project`
-| Inventory | `Module 09 Inventory`
-| Playbook | `playbooks/use_hub_collection.yml`
-|===
-
-Launch it. A successful job means Controller used the organization Galaxy credential to install the signed collection from PAH, then executed a module from that collection.
+* Private Automation Hub is serving the signed `ansible.test_collection`
+* The token in your Galaxy credential is valid
+* In a multi-node / routable production deployment, Controller project sync would use the organization Galaxy credential the same way when it processes `collections/requirements.yml`
 
 === How the Trust Boundaries Differ
 
@@ -282,7 +280,7 @@ Launch it. A successful job means Controller used the organization Galaxy creden
 | **This lab (embedded collection)** | **Org Galaxy credential approach**
 
 | Collection files committed into the git project
-| Collection pulled from PAH at sync time via `collections/requirements.yml`
+| Collection declared in `collections/requirements.yml` and installed from PAH
 
 | Org does not need a PAH Galaxy credential for the collection
 | Organization Galaxy credential controls which hub/Galaxy servers may supply content
@@ -294,7 +292,7 @@ Launch it. A successful job means Controller used the organization Galaxy creden
 | Uses an `Ansible Galaxy/Automation Hub API Token` on the organization
 
 | Collection GPG verification shown on the CLI in Module 8 (`--keyring`)
-| Collection GPG verification is still a client/keyring concern; Controller's org-level control is *which content server* is trusted
+| Collection GPG verification remains a client/keyring concern; Controller's org-level control is *which content server* is trusted
 |===
 
 The Galaxy-credential approach is what most production Controller setups use: keep playbooks in git, keep collections in Private Automation Hub, and scope hub access per organization. Combine it with project signing when you also want `ansible-sign` protection on the repository that declares those dependencies.
@@ -308,7 +306,7 @@ This lab has covered the complete content signing story in Ansible Automation Pl
 * **Project signing** (Modules 2-5): You used `ansible-sign` to sign Ansible projects locally with your own GPG key. Automation Controller validated those signatures when syncing projects from source control.
 * **Collection signing** (Modules 6-8): You published collections to Private Automation Hub, which signed them server-side using its own signing service. You verified those signatures on the client side using `ansible-galaxy` with a GPG keyring.
 * **End-to-end execution** (Module 9): You ran a playbook from Controller that uses a module from a signed collection -- all within a signature-validated project. The collection's integrity was established by PAH, and the project's integrity was validated by Controller.
-* **Organization Galaxy credentials** (Going Further): You configured an `Ansible Galaxy/Automation Hub API Token` on the organization so Controller could install signed collections from PAH via `requirements.yml` -- the production-oriented alternative to embedding collections in git.
+* **Organization Galaxy credentials** (Going Further): You configured an `Ansible Galaxy/Automation Hub API Token` on the organization -- the production control plane for which content servers projects may use with `requirements.yml` -- and verified that hub URL and token against Private Automation Hub.
 
 Together, these mechanisms provide end-to-end content integrity for Ansible automation -- from the projects that define your automation workflows to the reusable collections they depend on.
 
