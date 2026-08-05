@@ -1,0 +1,115 @@
+= Lab Guide: Publish Collections to Private Automation Hub
+
+_A guide to publishing Ansible collections to Private Automation Hub for signing and distribution._
+
+---
+
+[discrete]
+====
+*Estimated time to complete: 10 minutes*
+====
+
+In the previous modules, you signed an Ansible *project* locally using `ansible-sign` and validated it in automation controller. In this module, you will begin working with a different signing workflow: *collection signing* in Private Automation Hub (PAH).
+
+With collection signing, the hub itself signs content server-side when an administrator approves it. This means developers publish unsigned collections, and the hub's signing service applies a cryptographic signature at approval time. Consumers then verify signatures when installing collections using `ansible-galaxy`.
+
+---
+
+== Task 1: Explore Private Automation Hub
+
+Private Automation Hub is accessible through the same AAP gateway you have been using. Go to the `Automation-Controller` tab and log in if needed.
+
+[IMPORTANT]
+====
+.AAP Credentials
+* **Username:** `admin`
+* **Password:** `ansible123!`
+====
+
+Navigate to **Automation Content** -> **Namespaces** from the left-hand menu. You should see two pre-created namespaces among others:
+
+* **`ansible`** -- for the `ansible.test_collection` collection
+* **`community`** -- for the `community.lab_collection` collection
+
+These namespaces organize collections by ownership. Only users with the `upload_to_namespace` permission can publish collections to a given namespace.
+
+---
+
+== Task 2: Review Collection Artifacts
+
+The module setup script has prepared two collection tarballs and a Galaxy server configuration in your home directory. In the `Terminal` tab, list the artifacts:
+
+[source,bash]
+----
+ls ~/ansible-test_collection-1.0.0.tar.gz ~/community-lab_collection-1.0.0.tar.gz
+----
+
+These are pre-built Ansible collections packaged as tarballs. You can inspect what is inside one:
+
+[source,bash]
+----
+tar tzf ~/ansible-test_collection-1.0.0.tar.gz
+----
+
+Now review the `ansible.cfg` that has been configured to point to your Private Automation Hub instance:
+
+[source,bash]
+----
+cat ~/ansible.cfg
+----
+
+The configuration includes a `[galaxy_server.published_repo]` section with the hub URL and an authentication token. This tells `ansible-galaxy` where to publish and install collections.
+
+---
+
+== Task 3: Publish the First Collection
+
+Publish the `ansible.test_collection` to Private Automation Hub. Run the following command in the `Terminal`:
+
+[source,bash]
+----
+cd ~
+ansible-galaxy collection publish ansible-test_collection-1.0.0.tar.gz -c
+----
+
+NOTE: The `-c` flag tells `ansible-galaxy` to ignore SSL certificate verification errors, which is necessary in this lab environment.
+
+The collection is uploaded to the hub's *staging* repository. It is not yet available for installation -- it must be approved (and optionally signed) first.
+
+---
+
+== Task 4: Publish the Second Collection
+
+Now publish the `community.lab_collection`:
+
+[source,bash]
+----
+ansible-galaxy collection publish community-lab_collection-1.0.0.tar.gz -c
+----
+
+---
+
+== Task 5: Verify Collections in the Approval Dashboard
+
+Go back to the `Automation-Controller` tab and navigate to **Automation Content** -> **Collection Approvals**. You should see both collections listed and waiting for approval:
+
+* `ansible.test_collection` version `1.0.0`
+* `community.lab_collection` version `1.0.0`
+
+Both collections are in the staging area. In the next module, you will sign and approve them.
+
+---
+
+== Summary
+
+* You explored Private Automation Hub and its namespace structure.
+* You published two Ansible collections to the hub's staging repository using `ansible-galaxy collection publish`.
+* Collections land in staging by default and require administrator approval before they are available for installation.
+
+== Next Steps
+
+Press the `Next` button below to go to the next challenge once you've completed the tasks.
+
+== Troubleshooting
+
+If you have encountered an issue or have noticed something not quite right, please link:https://github.com/ansible/workshops/issues/new[open an issue].

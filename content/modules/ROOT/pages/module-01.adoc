@@ -35,6 +35,12 @@ The `ansible-sign` CLI tool is already installed on this system. If you run the 
 
 * **`ansible-sign-demo`**: This is an empty directory that will hold your playbooks. The contents of this repository will be signed using the `ansible-sign` tool in later challenges.
 
+In later modules on collection signing, additional artifacts will appear in your home directory:
+
+* **Collection tarballs**: Pre-built Ansible collections that you will publish to Private Automation Hub.
+* **`galaxy_signing_service.asc`**: The public GPG key for the hub's signing service, used to verify signed collections.
+* **`ansible.cfg`**: A Galaxy server configuration file for publishing and installing collections.
+
 You will create more artifacts as you progress through the lab, and they will be explained as you go.
 
 ---

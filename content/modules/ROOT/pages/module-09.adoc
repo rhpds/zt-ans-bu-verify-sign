@@ -1,0 +1,173 @@
+= Lab Guide: Run Signed Collections from Automation Controller
+
+_A capstone exercise: run a playbook that uses a signed collection from a signature-validated project._
+
+---
+
+[discrete]
+====
+*Estimated time to complete: 10 minutes*
+====
+
+In the previous modules, you signed an Ansible project locally (Modules 2-5) and signed collections server-side in Private Automation Hub (Modules 6-8). In this final module, you will tie everything together by running a playbook from Automation Controller that uses a module from a signed collection -- all within a signature-validated project.
+
+The module setup installed `ansible.test_collection` (signed and approved in Module 7) directly into the project and re-signed it with `ansible-sign`. This means Controller validates the integrity of the entire project -- including the embedded collection -- when it syncs from git.
+
+---
+
+== Task 1: Sync the Signed Project
+
+The module setup has added a new playbook and the signed `ansible.test_collection` to the `ansible-sign-demo` repository, then re-signed the project. You can verify the new files in the `Terminal` tab:
+
+[source,bash]
+----
+cat ~/ansible-sign-demo/playbooks/use_signed_collection.yml
+----
+
+[source,bash]
+----
+ls ~/ansible-sign-demo/playbooks/collections/ansible_collections/ansible/test_collection/
+----
+
+Now go to the `Automation-Controller` tab and log in if needed.
+
+[IMPORTANT]
+====
+.Automation Controller Credentials
+* **Username:** `admin`
+* **Password:** `ansible123!`
+====
+
+Navigate to **Automation Execution** -> **Projects**, and click the **Sync** button (the icon with two circling arrows) on the **Signed Project**.
+
+Watch the **Jobs** view for the sync to complete. It should succeed because the project signature is valid -- signed with the GPG key from Module 2 and validated by the credential from Module 3.
+
+You can verify the sync succeeded by clicking on the job and looking for:
+
+[source,text]
+----
+PLAY [Perform project signature/checksum verification] *************************
+
+TASK [Verify project content using GPG signature] ******************************
+ok: [localhost]
+
+TASK [Verify project content against checksum manifest] ************************
+ok: [localhost]
+----
+
+---
+
+== Task 2: Create an Inventory
+
+A Job Template needs an inventory to run against. Create a simple one with `localhost` as the only host.
+
+Navigate to **Automation Execution** -> **Infrastructure** -> **Inventories** and click **Create inventory** -> **Create inventory**.
+
+[cols="1,2a"]
+|===
+| Parameter | Value
+| Name | `Module 09 Inventory`
+| Organization | `Default`
+|===
+
+Click **Create Inventory**.
+
+Now click the **Hosts** tab, then **Create host**:
+
+[cols="1,2a"]
+|===
+| Parameter | Value
+| Name | `localhost`
+|===
+
+Click **Create Host**.
+
+---
+
+== Task 3: Create a Job Template
+
+Navigate to **Automation Execution** -> **Templates** and click **Create template** -> **Create job template**.
+
+[cols="1,2a"]
+|===
+| Parameter | Value
+| Name | `Signed Collection Demo`
+| Project | `Signed Project`
+| Inventory | `Module 09 Inventory`
+| Playbook | `playbooks/use_signed_collection.yml`
+|===
+
+Click **Create job template**.
+
+---
+
+== Task 4: Launch the Job
+
+Click the **Launch** button on the job template. This will:
+
+1. Use the **Signed Project** (signature-validated from git)
+2. Run the playbook that calls the `hello_world` module from `ansible.test_collection`
+
+Watch the job output. You should see:
+
+[source,text]
+----
+TASK [Call hello_world from ansible.test_collection] ***************************
+ok: [localhost] => {
+    "changed": false,
+    "msg": "Hello, AAP Controller! This module is from the signed ansible.test_collection."
+}
+
+TASK [Show the result] ********************************************************
+ok: [localhost] => {
+    "result.msg": "Hello, AAP Controller! This module is from the signed ansible.test_collection."
+}
+----
+
+A successful job proves the full end-to-end chain:
+
+* The collection was signed server-side by Private Automation Hub (Module 7)
+* The signed collection was embedded in the project and the project was re-signed with `ansible-sign`
+* Controller validated the project signature on sync -- covering the playbook, the collection, and all other project files
+* The playbook executed a module from the signed collection
+
+---
+
+== Summary
+
+* You synced the Signed Project, and Controller verified the GPG signature and checksum manifest -- validating the integrity of the entire project including the embedded signed collection.
+* You created an inventory and a Job Template.
+* You launched the job and saw it succeed -- proving that signed content flows from development to execution with integrity verified at every stage.
+
+== In Production: Galaxy Credentials for Organizations
+
+In this lab, you put the signed collection in the project repository. Automation Controller checked the project signature when the project synced.
+
+In production, teams usually keep collections out of git. They list the collections in a `collections/requirements.yml` file instead. When the project syncs, Automation Controller installs those collections from Private Automation Hub.
+
+To set that up:
+
+1. Create a credential of type **Ansible Galaxy/Automation Hub API Token**.
+2. Enter the Private Automation Hub URL and an API token.
+3. Open the organization and add that credential under **Galaxy credentials**.
+4. If the organization has more than one Galaxy credential, put the Private Automation Hub credential first.
+
+Automation Controller uses that organization list when it installs collections for projects in the organization.
+
+This is separate from the **Content Signature Validation Credential** on a project. Use the project GPG credential to check project signatures, as you did earlier in this lab. Use the organization Galaxy credential to control where collections come from.
+
+---
+
+== Conclusion
+
+This lab has covered the complete content signing story in Ansible Automation Platform:
+
+* **Project signing** (Modules 2-5): You used `ansible-sign` to sign Ansible projects locally with your own GPG key. Automation Controller validated those signatures when syncing projects from source control.
+* **Collection signing** (Modules 6-8): You published collections to Private Automation Hub, which signed them server-side using its own signing service. You verified those signatures on the client side using `ansible-galaxy` with a GPG keyring.
+* **End-to-end execution** (Module 9): You ran a playbook from Controller that uses a module from a signed collection -- all within a signature-validated project. The collection's integrity was established by PAH, and the project's integrity was validated by Controller.
+
+Together, these mechanisms provide end-to-end content integrity for Ansible automation -- from the projects that define your automation workflows to the reusable collections they depend on.
+
+== Troubleshooting
+
+If you have encountered an issue or have noticed something not quite right, please link:https://github.com/ansible/workshops/issues/new[open an issue].

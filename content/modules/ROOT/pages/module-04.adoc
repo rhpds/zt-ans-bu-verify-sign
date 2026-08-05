@@ -82,7 +82,7 @@ Commit the changes:
 git commit -m "Adding new files in the project"
 ----
 
-Finally, push the new files to the Gitea SCM. This system has credentials cached, so you do not need to log in.
+Finally, push the new files to the Gitea SCM with the username: `gitea` and password: `gitea`.
 
 [source,bash]
 ----
@@ -101,7 +101,7 @@ Go to the `Automation-Controller` tab and log in using the credentials below. On
 ====
 .Automation Controller Credentials
 * **Username:** `admin`
-* **Password:** `ansible1s23!`
+* **Password:** `ansible123!`
 ====
 
 The project sync should fail because the new files in the project were not signed.

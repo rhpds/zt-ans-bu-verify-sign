@@ -9,22 +9,34 @@ antora:
       solveButton: false
     - name: module-02
       label: "Create gpg keypair to sign projects locally"
-      solveButton: false
+      solveButton: true
     - name: module-03
       label: "Sign an empty Ansible project using ansible-sign and validate it in Automation Controller]"
-      solveButton: false
+      solveButton: true
     - name: module-04
       label: "Add new project content and validate without signing it"
-      solveButton: false
+      solveButton: true
     - name: module-05
       label: "Include the new files in signing manifest and re-sign and verify the project"
-      solveButton: false
+      solveButton: true
+    - name: module-06
+      label: "Publish Ansible collections to Private Automation Hub"
+      solveButton: true
+    - name: module-07
+      label: "Sign and approve collections in Private Automation Hub"
+      solveButton: true
+    - name: module-08
+      label: "Install and verify signed collections with GPG verification"
+      solveButton: true
+    - name: module-09
+      label: "Run signed collections from Automation Controller"
+      solveButton: true
 
 tabs:
 
-  - name: ">_ control"
+  - name: "Terminal"
     url: /wetty
-  - name: aap
+  - name: Automation-Controller
     url: https://control-${guid}.${domain}/
     external: false
   - name: Gitea

@@ -18,7 +18,7 @@ In the last challenge, you added playbooks to the `ansible-sign-demo` local repo
 
 First, you must add the new files to the `MANIFEST.in` file so the `ansible-sign` tool knows to sign them.
 
-Run the following command to append the new directives to your `MANIFEST.in`:
+Run the following command in the home directory to append the new directives to your `MANIFEST.in`:
 
 [source,bash]
 ----
@@ -79,7 +79,7 @@ Commit the changes:
 git commit -m "Adding signatures for new files in the project"
 ----
 
-Finally, push the new files and signatures to the Gitea SCM. This system has credentials cached, so you do not need to log in.
+Finally, push the new files and signatures to the Gitea SCM with the username: `gitea` and password: `gitea`.
 
 [source,bash]
 ----
@@ -129,9 +129,11 @@ The output indicates that the signature validation was successful.
 * You made changes to the `MANIFEST.in` file to include new files in the project.
 * You signed the new files in the project using `ansible-sign`, and automation controller was now able to verify the new files and their signatures.
 
-== Conclusion
+== Next Steps
 
-This concludes this lab. We hope it was able to demonstrate the advantages and changes to Ansible Automation Platform with the introduction of project signing.
+This concludes the project signing section of the lab. In the next modules, you will learn how to sign and verify *Ansible collections* using Private Automation Hub — a different but complementary signing workflow where the hub signs content server-side rather than locally with `ansible-sign`.
+
+Press the **Next** button below to continue.
 
 == Troubleshooting
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-echo "Starting module called module-03" >> /tmp/progress.log
+echo "Validated module called module-05" >> /tmp/progress.log
 
 sudo -u rhel bash -c : && RUNAS="sudo -u rhel"
 $RUNAS bash<<_

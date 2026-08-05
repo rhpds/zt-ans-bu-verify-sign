@@ -35,6 +35,7 @@ Now, run the following command in the `Terminal` to sign the project:
 
 [source,bash]
 ----
+cd ~
 ansible-sign project gpg-sign ansible-sign-demo
 ----
 
@@ -90,7 +91,7 @@ Commit the changes:
 git commit -m "Adding signatures for empty project"
 ----
 
-Push the new files to the Gitea SCM. This system has credentials cached, so you do not need to log in.
+Push the new files to the Gitea SCM with the username: `gitea` and password: `gitea`.
 
 [source,bash]
 ----
@@ -127,7 +128,7 @@ Fill out the form with these details:
 * **Credential Type:** `GPG Public Key`
 * **Public Key:** Paste the entire public key contents (including the `-----BEGIN...` and `-----END...` headers and footers) from your clipboard.
 
-Click **Save**.
+Click **Create Credential**.
 
 === Create the Project
 

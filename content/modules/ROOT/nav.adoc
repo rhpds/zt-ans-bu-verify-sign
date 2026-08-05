@@ -3,3 +3,7 @@
 * xref:module-03.adoc[Sign an empty Ansible project using ansible-sign and validate it in Automation Controller]
 * xref:module-04.adoc[Add new project content and validate without signing it]
 * xref:module-05.adoc[Include the new files in signing manifest and re-sign and verify the project]
+* xref:module-06.adoc[Publish Ansible collections to Private Automation Hub]
+* xref:module-07.adoc[Sign and approve collections in Private Automation Hub]
+* xref:module-08.adoc[Install and verify signed collections with GPG verification]
+* xref:module-09.adoc[Run signed collections from Automation Controller]
